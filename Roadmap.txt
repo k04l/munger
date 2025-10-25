@@ -1,0 +1,132 @@
+High-Level Roadmap: From 0 to 1 (MVP: Basic Dashboard with Tracking & Alerts)This is a 10-step plan, ~4-6 weeks part-time for a junior dev. Each step includes: Goals, Key Tasks, Tech/Files, Testing, and Handover Notes for future sessions (e.g., "Pick up by running npm start and checking /dashboard"). We'll do Steps 1-2 here if you want code; share your GitHub repo link for pushes. Use VS Code, Git init early. Total: Local dev first, deploy in Step 8.Step 1: Project Setup & Environment (1-2 days)Goals: Scaffold full-stack boilerplate, connect DB, run locally.
+Key Tasks:Create Git repo: git init, add .gitignore (node_modules, .env).
+Frontend: npx create-vite@latest frontend --template react, add Tailwind (npm i -D tailwindcss postcss autoprefixer, init config), Zustand (npm i zustand), Recharts (npm i recharts), PapaParse (npm i papaparse).
+Backend: In root, mkdir backend && cd backend && npm init -y, npm i express cors dotenv mongoose (wait, no—Mongoose is Mongo; use pg for Postgres: npm i pg express cors dotenv bcryptjs jsonwebtoken nodemailer axios technicalindicators).
+DB: Sign up Supabase (free), create project, get URL/port from dashboard. Add tables via SQL editor: users (id, email, password_hash), portfolios (user_id, stocks json), algos (user_id, weights json).
+.env: Add SUPABASE_URL, SUPABASE_KEY (from dashboard), JWT_SECRET=yourkey.
+Basic server: Express app.js with CORS, connect to Supabase via pg client.
+Run: Backend node backend/app.js (port 5000), frontend npm run dev (port 3000).
+
+Tech/Files:backend/app.js: Basic server skeleton.js
+
+const express = require('express');
+const cors = require('cors');
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_URL,
+});
+
+app.get('/health', (req, res) => res.send('OK'));
+
+app.listen(5000, () => console.log('Server on 5000'));
+
+Frontend: src/App.jsx with Tailwind setup (mobile viewport meta in index.html).
+
+Testing: curl localhost:5000/health, browser to localhost:5173 (Vite default).
+Handover Notes: Commit "feat: initial setup". For next session: Clone repo, npm i in frontend/backend, npm run dev + node app.js. If Supabase issues, check dashboard logs.
+
+Step 2: User Auth & Basic Dashboard UI (2-3 days)Goals: Secure login, mobile-first dashboard skeleton with placeholders.
+Key Tasks:Backend: Auth endpoints (/register, /login) using bcrypt (hash pw), jwt (sign token). Store in users table. Protect routes with middleware (verifyToken).
+Frontend: Login form (email/pw, useState for form), store token in localStorage/Zustand. Dashboard: Tailwind grid (mobile: stacked cards), placeholders for sections (e.g., <div className="bg-white p-4 rounded shadow md:grid-cols-2">Portfolio Card</div>).
+Mobile: Use Tailwind's sm/md breakpoints, test on phone dev tools.
+
+Tech/Files:backend/auth.js: Middleware + endpoints.js
+
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+// ... (pool from app.js)
+
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ msg: 'No token' });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ msg: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+};
+
+app.post('/register', async (req, res) => {
+  const { email, password } = req.body;
+  const hash = await bcrypt.hash(password, 10);
+  try {
+    await pool.query('INSERT INTO users (email, password_hash) VALUES ($1, $2)', [email, hash]);
+    res.status(201).json({ msg: 'User created' });
+  } catch (err) { res.status(400).json({ msg: 'User exists' }); }
+});
+
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+  if (!rows[0] || !await bcrypt.compare(password, rows[0].password_hash)) {
+    return res.status(401).json({ msg: 'Invalid creds' });
+  }
+  const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET);
+  res.json({ token });
+});
+
+Frontend src/components/Dashboard.jsx: Responsive layout.
+
+Testing: Register/login via Postman, dashboard loads post-auth (redirect if no token).
+Handover Notes: Commit "feat: auth + dashboard-ui". Next: Add axios calls to protected endpoints.
+
+Step 3: Portfolio Tracking Integration (3 days)Goals: Add/crud stocks to portfolio, fetch basic data via yfinance.
+Key Tasks: Backend endpoint /portfolio (GET/POST with auth), store as JSON in DB. Frontend form to add tickers, display list with price/P&L (fetch on load). Use yfinance npm (npm i yfinance backend) for quotes.
+Tech/Files: backend/portfolio.js routes; Frontend PortfolioCard with Recharts line (dummy data first).
+Testing: Add AAPL, see live price.
+Handover: Commit "feat: portfolio". Env: Add no API keys needed.
+
+Step 4: Big Players Tracking (2-3 days)Goals: Fetch/display recent trades (e.g., Pelosi).
+Key Tasks: Backend /big-players: Poll Quiver free API (axios GET https://api.quiverquant.com/beta/live/congresstrading?api_key=free& Congress=pelosi). Cache in DB. Frontend table/card view.
+Tech/Files: Use cheerio if parsing needed, but API is JSON.
+Testing: Manual poll, verify data.
+Handover: Commit "feat: big-players".
+
+Step 5: Market Trends & Charts (3 days)Goals: VIX, moving averages visuals.
+Key Tasks: Backend /trends?ticker=AAPL: Use Alpha Vantage free (sign up for key in .env, but $0 calls ok), technicalindicators.sma(). Frontend Recharts line/bar.
+Tech/Files: Integrate TA lib examples.
+Testing: Chart renders trends.
+Handover: Commit "feat: trends".
+
+Step 6: Custom Algo & Opportunities Scanner (4 days)Goals: Sliders for weights, backend scores stocks.
+Key Tasks: Frontend AlgoForm (sliders: use react-slider). POST to /opportunities, backend: Fetch data (sentiment via Finnhub free), compute score (e.g., if ma_up && sentiment>0.5 && vix<20, score++). List top 5.
+Tech/Files: backend/algo.js with weight fn.
+Testing: Tweak sliders, see ranked stocks.
+Handover: Commit "feat: algo".
+
+Step 7: Alerts & Notifications (2-3 days)Goals: Email on thresholds (e.g., position -10%, opportunity >80%).
+Key Tasks: Backend cron job (node-cron npm) polls DB every 15min, Nodemailer send if trigger. Frontend toggle for alerts.
+Tech/Files: .env: EMAIL_USER/PASS (Gmail app pw).
+Testing: Mock trigger, check inbox.
+Handover: Commit "feat: alerts". Note: SMS later.
+
+Step 8: CSV Export & Polish (2 days)Goals: Download buttons, mobile tweaks.
+Key Tasks: Frontend: PapaParse.unparse(data), <a download> link.
+Tech/Files: ExportPortfolio.jsx.
+Testing: Download verifies CSV.
+Handover: Commit "feat: export".
+
+Step 9: Deployment to Heroku/Supabase (1 day)Goals: Live app.
+Key Tasks: Heroku CLI: heroku create, Procfile ("web: node backend/app.js"), git push heroku main. Supabase connect via env vars. Frontend: Build (npm run build), serve static via Express or separate Heroku app.
+Tech/Files: Procfile, heroku-postbuild script.
+Testing: Live URL, auth works.
+Handover: Commit "chore: deploy". Share app URL.
+
+Step 10: MVP Testing & Iterate (Ongoing, 2-3 days)Goals: End-to-end, feedback loop.
+Key Tasks: Manual tests (add stock, scan, alert). Add error handling. Plan v2 (SMS, advanced AI).
+Tech/Files: Add Jest (npm i -D jest) for unit tests.
+Testing: Full user flow.
+Handover: Branch "mvp-complete". For next: Open issues for features.
+
+
+
+***********
+
+Supabase Database Password = Su85*44se!!!
+
