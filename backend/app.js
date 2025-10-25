@@ -1,31 +1,23 @@
+// backend/app.js
+
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
-require('dotenv').config();
+const { pool } = require('./db'); // Import pool from db.js
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool({
-  connectionString: process.env.SUPABASE_CONNECTION_STRING,
-});
-
 app.get('/health', (req, res) => res.send('OK'));
 
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+// Import and use portfolio routes
+const portfolioRoutes = require('./routes/portfolio');
+app.use('/portfolio', portfolioRoutes);
 
-// Auth middleware
-const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ msg: 'No token' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ msg: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-};
+// Import auth middleware
+const { verifyToken } = require('./auth');
 
 // Register
 app.post('/register', async (req, res) => {

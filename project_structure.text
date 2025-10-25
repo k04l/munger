@@ -1,0 +1,30 @@
+- .gitignore
+- backend
+  - .env
+  - app.js
+  - package-lock.json
+  - package.json
+- frontend
+  - .gitignore
+  - eslint.config.js
+  - index.html
+  - package-lock.json
+  - package.json
+  - public
+    - index.html
+    - vite.svg
+  - README.md
+  - src
+    - App.css
+    - App.jsx
+    - assets
+      - react.svg
+    - components
+      - Dashboard.jsx
+      - Login.jsx
+    - index.css
+    - main.jsx
+  - vite.config.js
+- index.html
+- LICENSE
+- Roadmap.txt
